@@ -5443,6 +5443,29 @@
 		</BitFields>
 	</Register>
 	<Register>
+		<Name>reg0C0</Name>
+		<Address>0x0C0</Address>
+		<Description>test11</Description>
+		<Exists>True</Exists>
+		<Width>8</Width>
+		<Notes></Notes>
+		<BitFields>
+		<BitField>
+			<Name>reg0C0_b7_b0</Name>
+			<Access>R/W</Access>
+			<DefaultValue>32</DefaultValue>
+			<Description>Set to 0xFF</Description>
+			<Visibility>Public</Visibility>
+			<Width>8</Width>
+			<Notes></Notes>
+			<BitOffset>0</BitOffset>
+			<RegOffset>0</RegOffset>
+			<SliceWidth>8</SliceWidth>
+		</BitField>
+		</BitFields>
+	</Register>
+
+	<Register>
 		<Name>reg0C2</Name>
 		<Address>0x0C2</Address>
 		<Description>Tx BBF R1</Description>

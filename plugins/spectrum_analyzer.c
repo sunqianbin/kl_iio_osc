@@ -784,92 +784,172 @@ static int handle_external_request (struct osc_plugin *plugin, const char *reque
 	return ret;
 }
 
-static GtkWidget * analyzer_init(struct osc_plugin *plugin, GtkWidget *notebook, const char *ini_fn)
-{
-	GtkBuilder *builder;
-	struct iio_channel *ch1;
 
-	ctx = osc_create_context();
-	if (!ctx)
-		return NULL;
 
-	dev = iio_context_find_device(ctx, PHY_DEVICE);
-	if (!dev)
-		goto destroy_ctx;
-	cap = iio_context_find_device(ctx, CAP_DEVICE);
-	if (!cap)
-		goto destroy_ctx;
-	alt_ch0 = iio_device_find_channel(dev, "altvoltage0", true);
-	if (!alt_ch0)
-		goto destroy_ctx;
+// 假设 osc_create_context、osc_destroy_context、osc_load_glade_file 等函数已定义
 
-	ch1 = iio_device_find_channel(dev, "voltage1", false);
-	is_2rx_2tx = ch1 && iio_channel_find_attr(ch1, "hardwaregain");
+// 定义一键测试按钮点击事件的回调函数
+static void one_key_test_clicked(GtkButton *button, gpointer user_data) {
+    // 在这里实现一键测试的具体逻辑
+    g_print("一键测试按钮被点击\n");
+}
 
-	init_device_list(ctx);
+// 定义停止测试按钮点击事件的回调函数
+static void stop_test_clicked(GtkButton *button, gpointer user_data) {
+    // 在这里实现停止测试的具体逻辑
+    g_print("停止测试按钮被点击\n");
+}
+static void checkbox_toggled(GtkToggleButton *togglebutton, gpointer user_data) {
+    gboolean is_active = gtk_toggle_button_get_active(togglebutton);
+    const gchar *label = gtk_button_get_label(GTK_BUTTON(togglebutton));
+    g_print("%s 勾选状态: %s\n", label, is_active ? "已勾选" : "未勾选");
+}
 
-	if (iio_channel_find_attr(alt_ch0, "fastlock_store"))
-		rx_fastlock_store_name = "fastlock_store";
-	else
-		rx_fastlock_store_name = "RX_LO_fastlock_store";
-	if (iio_channel_find_attr(alt_ch0, "fastlock_save"))
-		rx_fastlock_save_name = "fastlock_save";
-	else
-		rx_fastlock_save_name = "RX_LO_fastlock_save";
+static void increase_value(GtkButton *button, gpointer user_data) {
+    GtkEntry *entry = GTK_ENTRY(user_data);
+    const gchar *text = gtk_entry_get_text(entry);
+    double value = atof(text);
+    if (value < 60000.0) {
+        value += 1.0;
+        gchar new_text[20];
+        g_snprintf(new_text, sizeof(new_text), "%.6f", value);
+        gtk_entry_set_text(entry, new_text);
+    }
+}
 
-	builder = gtk_builder_new();
-	nbook = GTK_NOTEBOOK(notebook);
+static void decrease_value(GtkButton *button, gpointer user_data) {
+    GtkEntry *entry = GTK_ENTRY(user_data);
+    const gchar *text = gtk_entry_get_text(entry);
+    double value = atof(text);
+    if (value > 0.0) {
+        value -= 1.0;
+        gchar new_text[20];
+        g_snprintf(new_text, sizeof(new_text), "%.6f", value);
+        gtk_entry_set_text(entry, new_text);
+    }
+}
 
-	if (osc_load_glade_file(builder, "spectrum_analyzer") < 0)
-		goto destroy_ctx;
+static GtkWidget * analyzer_init(struct osc_plugin *plugin, GtkWidget *notebook, const char *ini_fn) {
+    GtkBuilder *builder;
+    struct iio_channel *ch1;
 
-	analyzer_panel = GTK_WIDGET(gtk_builder_get_object(builder,
-				"spectrum_analyzer_panel"));
-	center_freq = GTK_WIDGET(gtk_builder_get_object(builder,
-				"spin_center_freq"));
-	freq_bw = GTK_WIDGET(gtk_builder_get_object(builder,
-				"spin_freq_bw"));
-	available_RBWs = GTK_WIDGET(gtk_builder_get_object(builder,
-				"cmb_available_rbw"));
-	receiver1 = GTK_WIDGET(gtk_builder_get_object(builder,
-				"radiobutton_rx1"));
-	start_button = GTK_WIDGET(gtk_builder_get_object(builder,
-				"start_sweep_btn"));
-	stop_button = GTK_WIDGET(gtk_builder_get_object(builder,
-				"stop_sweep_btn"));
+    ctx = osc_create_context();
+    if (!ctx)
+        return NULL;
 
-	/* Widgets initialization */
-	gtk_spin_button_set_range(GTK_SPIN_BUTTON(center_freq),
-		70 + sweep_freq_step / 2, 6000 - sweep_freq_step / 2);
-	gtk_adjustment_set_lower(gtk_spin_button_get_adjustment(
-		GTK_SPIN_BUTTON(freq_bw)), sweep_freq_step);
-	comboboxtext_rbw_fill(GTK_COMBO_BOX_TEXT(available_RBWs),
-				HZ_TO_MHZ(sampling_rate));
-	gtk_combo_box_set_active(GTK_COMBO_BOX(available_RBWs), 6);
+    dev = iio_context_find_device(ctx, PHY_DEVICE);
+    if (!dev)
+        goto destroy_ctx;
+    cap = iio_context_find_device(ctx, CAP_DEVICE);
+    if (!cap)
+        goto destroy_ctx;
+    alt_ch0 = iio_device_find_channel(dev, "altvoltage0", true);
+    if (!alt_ch0)
+        goto destroy_ctx;
 
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(receiver1), true);
-	if (!is_2rx_2tx)
-		gtk_widget_hide(GTK_WIDGET(gtk_builder_get_object(builder,
-				"frame_receiver_selection")));
+    ch1 = iio_device_find_channel(dev, "voltage1", false);
+    is_2rx_2tx = ch1 && iio_channel_find_attr(ch1, "hardwaregain");
 
-	gtk_widget_set_sensitive(GTK_WIDGET(stop_button), false);
+    init_device_list(ctx);
 
-	/* Connect signals */
-	g_builder_connect_signal(builder, "start_sweep_btn", "clicked",
-			G_CALLBACK(start_sweep_clicked), NULL);
-	g_builder_connect_signal(builder, "stop_sweep_btn", "clicked",
-			G_CALLBACK(stop_sweep_clicked), NULL);
-	g_builder_connect_signal(builder, "spin_center_freq", "value-changed",
-			G_CALLBACK(center_freq_changed), NULL);
-	g_signal_connect_swapped(freq_bw, "value-changed",
-			G_CALLBACK(center_freq_changed), center_freq);
+    if (iio_channel_find_attr(alt_ch0, "fastlock_store"))
+        rx_fastlock_store_name = "fastlock_store";
+    else
+        rx_fastlock_store_name = "RX_LO_fastlock_store";
+    if (iio_channel_find_attr(alt_ch0, "fastlock_save"))
+        rx_fastlock_save_name = "fastlock_save";
+    else
+        rx_fastlock_save_name = "RX_LO_fastlock_save";
 
-	return analyzer_panel;
+    builder = gtk_builder_new();
+    nbook = GTK_NOTEBOOK(notebook);
+
+    if (osc_load_glade_file(builder, "spectrum_analyzer") < 0)
+        goto destroy_ctx;
+
+    // 加载 new_test_page.glade 文件
+    if (osc_load_glade_file(builder, "new_test_page") < 0) {
+        osc_destroy_context(ctx);
+        return NULL;
+    }
+
+    analyzer_panel = GTK_WIDGET(gtk_builder_get_object(builder,
+                "spectrum_analyzer_panel"));
+    center_freq = GTK_WIDGET(gtk_builder_get_object(builder,
+                "spin_center_freq"));
+    freq_bw = GTK_WIDGET(gtk_builder_get_object(builder,
+                "spin_freq_bw"));
+    available_RBWs = GTK_WIDGET(gtk_builder_get_object(builder,
+                "cmb_available_rbw"));
+    receiver1 = GTK_WIDGET(gtk_builder_get_object(builder,
+                "radiobutton_rx1"));
+    start_button = GTK_WIDGET(gtk_builder_get_object(builder,
+                "start_sweep_btn"));
+    stop_button = GTK_WIDGET(gtk_builder_get_object(builder,
+                "stop_sweep_btn"));
+
+    // 获取 new_test_page 中的控件
+    GtkWidget *test_page = GTK_WIDGET(gtk_builder_get_object(builder, "test_page"));
+    GtkWidget *one_key_test_button = GTK_WIDGET(gtk_builder_get_object(builder, "one_key_test_button"));
+    GtkWidget *stop_test_button = GTK_WIDGET(gtk_builder_get_object(builder, "stop_test_button"));
+    GtkWidget *test1_checkbox = GTK_WIDGET(gtk_builder_get_object(builder, "test1_checkbox"));
+    GtkWidget *test2_checkbox = GTK_WIDGET(gtk_builder_get_object(builder, "test2_checkbox"));
+    GtkWidget *test3_checkbox = GTK_WIDGET(gtk_builder_get_object(builder, "test3_checkbox"));
+    GtkWidget *test4_checkbox = GTK_WIDGET(gtk_builder_get_object(builder, "test4_checkbox"));
+    GtkWidget *freq_entry = GTK_WIDGET(gtk_builder_get_object(builder, "freq_entry"));
+    GtkWidget *increase_button = GTK_WIDGET(gtk_builder_get_object(builder, "increase_button"));
+    GtkWidget *decrease_button = GTK_WIDGET(gtk_builder_get_object(builder, "decrease_button"));
+
+    // 将 test_page 添加到 notebook 中
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), test_page, gtk_label_new("test page"));
+
+    /* Widgets initialization */
+    gtk_spin_button_set_range(GTK_SPIN_BUTTON(center_freq),
+        70 + sweep_freq_step / 2, 6000 - sweep_freq_step / 2);
+    gtk_adjustment_set_lower(gtk_spin_button_get_adjustment(
+        GTK_SPIN_BUTTON(freq_bw)), sweep_freq_step);
+    comboboxtext_rbw_fill(GTK_COMBO_BOX_TEXT(available_RBWs),
+                HZ_TO_MHZ(sampling_rate));
+    gtk_combo_box_set_active(GTK_COMBO_BOX(available_RBWs), 6);
+
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(receiver1), true);
+    if (!is_2rx_2tx)
+        gtk_widget_hide(GTK_WIDGET(gtk_builder_get_object(builder,
+                "frame_receiver_selection")));
+
+    gtk_widget_set_sensitive(GTK_WIDGET(stop_button), false);
+
+    /* Connect signals */
+    g_builder_connect_signal(builder, "start_sweep_btn", "clicked",
+            G_CALLBACK(start_sweep_clicked), NULL);
+    g_builder_connect_signal(builder, "stop_sweep_btn", "clicked",
+            G_CALLBACK(stop_sweep_clicked), NULL);
+    g_builder_connect_signal(builder, "spin_center_freq", "value-changed",
+            G_CALLBACK(center_freq_changed), NULL);
+    g_signal_connect_swapped(freq_bw, "value-changed",
+            G_CALLBACK(center_freq_changed), center_freq);
+
+    // 连接新按钮的信号
+    g_signal_connect(one_key_test_button, "clicked", G_CALLBACK(one_key_test_clicked), NULL);
+    g_signal_connect(stop_test_button, "clicked", G_CALLBACK(stop_test_clicked), NULL);
+
+    // 连接勾选框的信号
+    g_signal_connect(test1_checkbox, "toggled", G_CALLBACK(checkbox_toggled), NULL);
+    g_signal_connect(test2_checkbox, "toggled", G_CALLBACK(checkbox_toggled), NULL);
+    g_signal_connect(test3_checkbox, "toggled", G_CALLBACK(checkbox_toggled), NULL);
+    g_signal_connect(test4_checkbox, "toggled", G_CALLBACK(checkbox_toggled), NULL);
+
+    // 连接频率输入框和 + - 按钮的信号
+    g_signal_connect(increase_button, "clicked", G_CALLBACK(increase_value), freq_entry);
+    g_signal_connect(decrease_button, "clicked", G_CALLBACK(decrease_value), freq_entry);
+
+    return analyzer_panel;
 
 destroy_ctx:
-	osc_destroy_context(ctx);
-	return NULL;
-}
+    osc_destroy_context(ctx);
+    return NULL;
+}    
+
 
 static void update_active_page(struct osc_plugin *plugin, gint active_page, gboolean is_detached)
 {
